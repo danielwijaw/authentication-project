@@ -2,7 +2,11 @@
 
 namespace App\Exceptions;
 
+use App\Helpers\ApiResponse;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -26,5 +30,49 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             //
         });
+    }
+
+    public function render($request, Throwable $e)
+    {
+        // Validation Error (422)
+        if ($e instanceof ValidationException) {
+            return ApiResponse::error(
+                'Validation error',
+                422,
+                $e->errors()
+            );
+        }
+
+        // Unauthenticated (401 - Sanctum)
+        if ($e instanceof AuthenticationException) {
+            return ApiResponse::error(
+                'Unauthorized',
+                401
+            );
+        }
+
+        // Forbidden (403 - Policy)
+        if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+            return ApiResponse::error(
+                'Forbidden',
+                403
+            );
+        }
+
+        // HTTP Exception (404, 405, etc)
+        if ($e instanceof HttpExceptionInterface) {
+            return ApiResponse::error(
+                $e->getMessage() ?: 'HTTP Error',
+                $e->getStatusCode()
+            );
+        }
+
+        // Fallback 500
+        return ApiResponse::error(
+            app()->environment('production') 
+                ? 'Internal Server Error' 
+                : $e->getMessage(),
+            500
+        );
     }
 }
